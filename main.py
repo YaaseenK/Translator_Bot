@@ -29,7 +29,7 @@ async def translate(interaction: discord.Interaction, to: str, text: str):
         description=f"**Detected:** `{detected.lang}`\n**To:** `{to}`\n\n**Result:** {result.text}",
         color=discord.Color.blue()
     )
-    embed.set_footer(text="Powered by your custom bot ✨")
+    embed.set_footer(text="Powered by YoPro's custom bot ✨")
     await interaction.followup.send(embed=embed)
 
 client.run(os.getenv("BOT_TOKEN"))
