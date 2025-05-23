@@ -56,6 +56,7 @@ async def translate(interaction: discord.Interaction, to: str, text: str):
 
 # Mapping of channel names to their target language codes
 channel_language_map = {
+    "english-chat": "en",
     "french-chat": "fr",
     "spanish-chat": "es",
     "german-chat": "de",
@@ -64,8 +65,8 @@ channel_language_map = {
     "chinese-chat": "zh-cn",
     "japanese-chat": "ja",
     "korean-chat": "ko",
-    "hindi-chat": "hi",
-    "english-chat": "en"
+    "hindi-chat": "hi"
+
 }
 
 @client.event
