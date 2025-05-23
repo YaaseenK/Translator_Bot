@@ -66,42 +66,29 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    origin_channel_name = message.channel.name
-    origin_language = channel_language_map.get(origin_channel_name)
+    source_lang = translator.detect(message.content).lang
 
-    if not origin_language:
-        return  # Only act in mapped language channels
+    for channel_name, target_lang in channel_language_map.items():
+        if target_lang == source_lang:
+            continue  # Don't re-post in same language
 
-    try:
-        detected = translator.detect(message.content)
-    except Exception as e:
-        print(f"Detection failed: {e}")
-        return
+        channel = discord.utils.get(message.guild.text_channels, name=channel_name)
+        if not channel:
+            continue  # Skip if channel doesn't exist
 
-    # Translate to all other languages in other channels
-    for target_channel_name, target_lang_code in channel_language_map.items():
-        if target_channel_name == origin_channel_name:
-            continue  # Skip origin channel
+        result = translator.translate(message.content, dest=target_lang)
 
-        try:
-            result = translator.translate(message.content, dest=target_lang_code)
+        embed = discord.Embed(
+            title="🌐 Universal Translation",
+            description=f"**From ({source_lang}) ➡️ To ({target_lang})**\n\n**{result.text}**",
+            color=discord.Color.purple()
+        )
+        embed.set_footer(text=f"Original by {message.author.display_name} in #{message.channel.name}")
+        await channel.send(embed=embed)
 
-            embed = discord.Embed(
-                title="🌍 Universal Translation",
-                description=result.text,
-                color=discord.Color.teal()
-            )
-            embed.set_footer(
-                text=f"From #{origin_channel_name} | Detected: {detected.lang} → {target_lang_code}"
-            )
+    # 🔧 This line ensures slash commands and other events still work
+    await client.process_commands(message)
 
-            target_channel = discord.utils.get(message.guild.text_channels, name=target_channel_name)
-            if target_channel:
-                await target_channel.send(embed=embed)
-
-        except Exception as e:
-            print(f"Translation to {target_lang_code} failed: {e}")
-            continue
 
 # Run the bot using your environment token
 client.run(os.getenv("BOT_TOKEN"))
