@@ -9,50 +9,11 @@ import os  # For accessing environment variables
 intents = discord.Intents.default()
 intents.message_content = True
 
-# Initialize the bot with a command prefix (not used with slash commands, but still required)
+# Initialize the bot
 client = commands.Bot(command_prefix="/", intents=intents)
 
 # Initialize the Google Translate API wrapper
 translator = Translator()
-
-# Event: Bot is ready and connected to Discord
-@client.event
-async def on_ready():
-    print(f"{client.user} is online!")
-
-    # Try to sync slash commands to Discord's API
-    try:
-        synced = await client.tree.sync()
-        print(f"Synced {len(synced)} slash command(s)")
-    except Exception as e:
-        print(f"Failed to sync commands: {e}")
-
-# Slash command: /translate
-# Usage: /translate to:fr text:hello
-@client.tree.command(name="translate", description="Translate text to another language")
-@app_commands.describe(
-    to="Language code to translate to (e.g., fr, es, de)",  # Slash command hint for target language
-    text="The text to translate"  # Slash command hint for message content
-)
-async def translate(interaction: discord.Interaction, to: str, text: str):
-    await interaction.response.defer()  # Acknowledge the interaction early (avoids timeout)
-
-    # Detect the source language automatically
-    detected = translator.detect(text)
-
-    # Translate the text to the target language
-    result = translator.translate(text, dest=to)
-
-    # Build a clean Discord embed message
-    embed = discord.Embed(
-        title=f"🌍 Translation",
-        description=f"**Detected:** `{detected.lang}`\n**To:** `{to}`\n\n**Result:** {result.text}",
-        color=discord.Color.blue()
-    )
-    embed.set_footer(text="Powered by YoPro's custom bot ✨")
-
-    # Send the translation back to the user
-    await interaction.followup.send(embed=embed)
 
 # Mapping of channel names to their target language codes
 channel_language_map = {
@@ -66,43 +27,81 @@ channel_language_map = {
     "japanese-chat": "ja",
     "korean-chat": "ko",
     "hindi-chat": "hi"
-
 }
 
+# Event: Bot is ready and connected to Discord
+@client.event
+async def on_ready():
+    print(f"{client.user} is online!")
+
+    # Sync slash commands to Discord
+    try:
+        synced = await client.tree.sync()
+        print(f"Synced {len(synced)} slash command(s)")
+    except Exception as e:
+        print(f"Failed to sync commands: {e}")
+
+# Slash command: /translate
+@client.tree.command(name="translate", description="Translate text to another language")
+@app_commands.describe(
+    to="Language code to translate to (e.g., fr, es, de)",
+    text="The text to translate"
+)
+async def translate(interaction: discord.Interaction, to: str, text: str):
+    await interaction.response.defer()
+    detected = translator.detect(text)
+    result = translator.translate(text, dest=to)
+
+    embed = discord.Embed(
+        title="🌍 Translation",
+        description=f"**Detected:** `{detected.lang}`\n**To:** `{to}`\n\n**Result:** {result.text}",
+        color=discord.Color.blue()
+    )
+    embed.set_footer(text="Powered by YoPro's custom bot ✨")
+    await interaction.followup.send(embed=embed)
+
+# Universal translation for all messages in mapped channels
 @client.event
 async def on_message(message):
-    # Ignore bot's own messages
     if message.author.bot:
         return
 
-    # Get the target language from the channel name
-    target_lang = channel_language_map.get(message.channel.name)
+    origin_channel_name = message.channel.name
+    origin_language = channel_language_map.get(origin_channel_name)
 
-    # Only act in mapped language channels
-    if target_lang:
-        # Detect source language
+    if not origin_language:
+        return  # Only act in mapped language channels
+
+    try:
         detected = translator.detect(message.content)
+    except Exception as e:
+        print(f"Detection failed: {e}")
+        return
 
-        # If the message is already in the target language, do nothing
-        if detected.lang == target_lang:
-            return
+    # Translate to all other languages in other channels
+    for target_channel_name, target_lang_code in channel_language_map.items():
+        if target_channel_name == origin_channel_name:
+            continue  # Skip origin channel
 
-        # Translate to the channel’s target language
-        result = translator.translate(message.content, dest=target_lang)
+        try:
+            result = translator.translate(message.content, dest=target_lang_code)
 
-        # Format and send an embed with the translation
-        embed = discord.Embed(
-            title=f"🌐 Auto-Translation",
-            description=(
-                f"**From:** `{detected.lang}`\n"
-                f"**To:** `{target_lang}`\n\n"
-                f"**Result:** {result.text}"
-            ),
-            color=discord.Color.orange()
-        )
-        embed.set_footer(text="Auto-translated by YoPro’s bot ✨")
-        await message.channel.send(embed=embed)
+            embed = discord.Embed(
+                title="🌍 Universal Translation",
+                description=result.text,
+                color=discord.Color.teal()
+            )
+            embed.set_footer(
+                text=f"From #{origin_channel_name} | Detected: {detected.lang} → {target_lang_code}"
+            )
 
+            target_channel = discord.utils.get(message.guild.text_channels, name=target_channel_name)
+            if target_channel:
+                await target_channel.send(embed=embed)
 
-# Start the bot using the token stored in your environment variable
+        except Exception as e:
+            print(f"Translation to {target_lang_code} failed: {e}")
+            continue
+
+# Run the bot using your environment token
 client.run(os.getenv("BOT_TOKEN"))
