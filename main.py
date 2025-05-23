@@ -64,7 +64,8 @@ channel_language_map = {
     "chinese-chat": "zh-cn",
     "japanese-chat": "ja",
     "korean-chat": "ko",
-    "hindi-chat": "hi"
+    "hindi-chat": "hi",
+    "english-chat": "en"
 }
 
 @client.event
